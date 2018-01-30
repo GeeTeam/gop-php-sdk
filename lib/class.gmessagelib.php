@@ -12,13 +12,21 @@ class GMessageLib {
     public static $socketTimeout  = 2;
 
     private $response;
+    private $public_key = "-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDB45NNFhRGWzMFPn9I7k7IexS5
+XviJR3E9Je7L/350x5d9AtwdlFH3ndXRwQwprLaptNb7fQoCebZxnhdyVl8Jr2J3
+FZGSIa75GJnK4IwNaG10iyCjYDviMYymvCtZcGWSqSGdC/Bcn2UCOiHSMwgHJSrg
+Bm1Zzu+l8nSOqAurgQIDAQAB
+-----END PUBLIC KEY-----";
 
     public function __construct($onepass_id, $private_key) {
         $this->onepass_id  = $onepass_id;
         $this->private_key = $private_key;
+        $this->pubkey = openssl_pkey_get_public($this->public_key);
     }
 
-    public function check_gateway($process_id, $accesscode, $phone, $user_id = "test", $ssl= false) {
+
+    public function check_gateway($process_id, $accesscode, $phone, $user_id = "test", $ssl= false, $testbutton=true) {
         $query = array(
             "process_id" => $process_id,
             "timestamp"=>time(),
@@ -33,6 +41,11 @@ class GMessageLib {
         }
         else{
             $url = "http://onepass.geetest.com/check_gateway.php";
+        }
+        if ($testbutton == false) {
+            $sign_data = $this->onepass_id."&&".md5($this->private_key)."&&".(string)(time()*1000);
+            $sign = $this->rsa_encrypt($sign_data);
+            $query['sign'] = $sign;
         }
         $codevalidate = $this->post_request($url, $query);
         $obj = json_decode($codevalidate,true);
@@ -137,6 +150,16 @@ class GMessageLib {
             }
         }
 
+        return $data;
+    }
+
+    private function rsa_encrypt($data) {
+        if (openssl_public_encrypt($data, $encrypted, $this->pubkey)){
+          $data = base64_encode($encrypted);
+        }
+        else{
+            throw new Exception('encrypt wrong');
+        }
         return $data;
     }
 
